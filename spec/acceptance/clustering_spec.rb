@@ -7,16 +7,12 @@ describe 'rabbitmq clustering' do
     it 'runs successfully' do
       pp = <<-EOS
       class { 'rabbitmq':
-        cluster                  => { 'name' => 'rabbit_cluster', 'init_node' => $facts['fqdn'] },
+        cluster                  => { 'name' => 'rabbit_cluster', 'init_node' => $facts['networking']['fqdn'] },
         config_cluster           => true,
         cluster_nodes            => ['rabbit1', 'rabbit2'],
         cluster_node_type        => 'ram',
         erlang_cookie            => 'TESTCOOKIE',
         wipe_db_on_cookie_change => false,
-      }
-      if $facts['os']['family'] == 'RedHat' {
-        class { 'erlang': epel_enable => true}
-        Class['erlang'] -> Class['rabbitmq']
       }
       EOS
 
@@ -32,16 +28,12 @@ describe 'rabbitmq clustering' do
     it 'runs successfully' do
       pp = <<-EOS
       class { 'rabbitmq':
-        cluster                  => { 'name' => 'rabbit_cluster', 'init_node' => $facts['fqdn'] },
+        cluster                  => { 'name' => 'rabbit_cluster', 'init_node' => $facts['networking']['fqdn'] },
         config_cluster           => true,
         cluster_nodes            => ['rabbit1', 'rabbit2'],
         cluster_node_type        => 'ram',
         erlang_cookie            => 'TESTCOOKIE',
         wipe_db_on_cookie_change => true,
-      }
-      if $facts['os']['family'] == 'RedHat' {
-        class { 'erlang': epel_enable => true}
-        Class['erlang'] -> Class['rabbitmq']
       }
       EOS
 
@@ -83,10 +75,6 @@ describe 'rabbitmq clustering' do
         cluster_node_type        => 'ram',
         environment_variables    => { 'NODENAME' => 'rabbit@foobar' },
         erlang_cookie            => 'TESTCOOKIE',
-      }
-      if $facts['os']['family'] == 'RedHat' {
-        class { 'erlang': epel_enable => true}
-        Class['erlang'] -> Class['rabbitmq']
       }
       EOS
 

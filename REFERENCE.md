@@ -254,6 +254,7 @@ The following parameters are available in the `rabbitmq` class:
 * [`port`](#-rabbitmq--port)
 * [`python_package`](#-rabbitmq--python_package)
 * [`repos_ensure`](#-rabbitmq--repos_ensure)
+* [`require_epel`](#-rabbitmq--require_epel)
 * [`service_ensure`](#-rabbitmq--service_ensure)
 * [`service_manage`](#-rabbitmq--service_manage)
 * [`service_name`](#-rabbitmq--service_name)
@@ -392,7 +393,7 @@ Data type: `String`
 
 The file to use as the rabbitmq.config template.
 
-Default value: `'rabbitmq/rabbitmq.config.erb'`
+Default value: `'rabbitmq/rabbitmq.config.epp'`
 
 ##### <a name="-rabbitmq--config_additional_variables"></a>`config_additional_variables`
 
@@ -504,7 +505,7 @@ Data type: `String`
 
 The template file to use for rabbitmq_env.config.
 
-Default value: `'rabbitmq/rabbitmq-env.conf.erb'`
+Default value: `'rabbitmq/rabbitmq-env.conf.epp'`
 
 ##### <a name="-rabbitmq--env_config_path"></a>`env_config_path`
 
@@ -536,7 +537,7 @@ Default value: `undef`
 
 Data type: `Variant[Integer[-1],Enum['unlimited'],Pattern[/^(infinity|\d+(:(infinity|\d+))?)$/]]`
 
-Set rabbitmq file ulimit. Defaults to 16384. Only available on systems with `$::osfamily == 'Debian'` or `$::osfamily == 'RedHat'`.
+Set rabbitmq file ulimit. Defaults to 16384. Only available on Linux
 
 Default value: `16384`
 
@@ -799,6 +800,14 @@ It also does not solve the erlang dependency.  See https://www.rabbitmq.com/whic
 different ways of handling the erlang deps.  See also https://github.com/voxpupuli/puppet-rabbitmq/issues/788
 
 Default value: `false`
+
+##### <a name="-rabbitmq--require_epel"></a>`require_epel`
+
+Data type: `Boolean`
+
+If this parameter is set, On CentOS / RHEL 7 systems, require the "puppet/epel" module
+
+Default value: `true`
 
 ##### <a name="-rabbitmq--service_ensure"></a>`service_ensure`
 

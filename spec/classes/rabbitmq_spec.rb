@@ -1,8 +1,5 @@
 # frozen_string_literal: true
 
-# rubocop:disable RSpec/RepeatedExampleGroupDescription
-# rubocop:disable RSpec/RepeatedExampleGroupBody
-
 require 'spec_helper'
 
 describe 'rabbitmq' do
@@ -122,39 +119,15 @@ describe 'rabbitmq' do
       end
 
       ['infinity', -1, 1234].each do |value|
-        context "with file_limit => '#{value}'" do
+        context "with file_limit => '#{value}'", if: os_facts['kernel'] == 'Linux' do
           let(:params) { { file_limit: value } }
 
-          if os_facts[:os]['family'] == 'RedHat'
-            it do
-              is_expected.to contain_file('/etc/security/limits.d/rabbitmq-server.conf').
-                with_owner('0').
-                with_group('0').
-                with_mode('0644').
-                that_notifies('Class[Rabbitmq::Service]').
-                with_content("rabbitmq soft nofile #{value}\nrabbitmq hard nofile #{value}\n")
-            end
-          else
-            it { is_expected.not_to contain_file('/etc/security/limits.d/rabbitmq-server.conf') }
-          end
+          selinux_ignore_defaults = os_facts[:os]['family'] == 'RedHat'
 
-          if os_facts[:os]['family'] == 'Debian'
-            it { is_expected.to contain_file('/etc/default/rabbitmq-server').with_content(%r{ulimit -n #{value}}) }
-          else
-            it { is_expected.not_to contain_file('/etc/default/rabbitmq-server') }
-          end
-
-          if os_facts[:systemd]
-            selinux_ignore_defaults = os_facts[:os]['family'] == 'RedHat'
-
-            it do
-              is_expected.to contain_systemd__service_limits("#{name}.service").
-                with_selinux_ignore_defaults(selinux_ignore_defaults).
-                with_limits('LimitNOFILE' => value).
-                with_restart_service(false)
-            end
-          else
-            it { is_expected.not_to contain_systemd__service_limits("#{name}.service") }
+          it do
+            is_expected.to contain_systemd__manage_dropin('service-90-limits.conf').
+              with_selinux_ignore_defaults(selinux_ignore_defaults).
+              with_service_entry({ 'LimitNOFILE' => value, 'OOMScoreAdjust' => 0 })
           end
         end
       end
@@ -170,24 +143,10 @@ describe 'rabbitmq' do
       end
 
       [-1000, 0, 1000].each do |value|
-        context "with oom_score_adj => '#{value}'" do
+        context "with oom_score_adj => '#{value}'", if: os_facts[:kernel] == 'Linux' do
           let(:params) { { oom_score_adj: value } }
 
-          if os_facts[:os]['family'] == 'Debian'
-            it { is_expected.to contain_file('/etc/default/rabbitmq-server').with_content(%r{^echo #{value} > /proc/\$\$/oom_score_adj$}) }
-          else
-            it { is_expected.not_to contain_file('/etc/default/rabbitmq-server') }
-          end
-
-          if os_facts[:systemd]
-            it do
-              is_expected.to contain_systemd__service_limits("#{name}.service").
-                with_limits('OOMScoreAdjust' => value).
-                with_restart_service(false)
-            end
-          else
-            it { is_expected.not_to contain_systemd__service_limits("#{name}.service") }
-          end
+          it { is_expected.to contain_systemd__manage_dropin('service-90-limits.conf').with_service_entry({ 'LimitNOFILE' => 16_384, 'OOMScoreAdjust' => value }) }
         end
       end
 
@@ -201,15 +160,12 @@ describe 'rabbitmq' do
         end
       end
 
-      context 'on systems with systemd', if: os_facts[:systemd] do
-        it do
-          is_expected.to contain_systemd__service_limits("#{name}.service").
-            with_restart_service(false)
-        end
+      context 'on Linux', if: os_facts[:kernel] == 'Linux' do
+        it { is_expected.to contain_systemd__manage_dropin('service-90-limits.conf') }
       end
 
-      context 'on systems without systemd', unless: os_facts[:systemd] do
-        it { is_expected.not_to contain_systemd__service_limits("#{name}.service") }
+      context 'on non-Linux', unless: os_facts[:kernel] == 'Linux' do
+        it { is_expected.not_to contain_systemd__manage_dropin('service-90-limits.conf') }
       end
 
       context 'with admin_enable set to true' do
@@ -234,7 +190,8 @@ describe 'rabbitmq' do
             is_expected.to contain_archive('rabbitmqadmin').with_source('http://1.1.1.1:15672/cli/rabbitmqadmin')
           end
 
-          it { is_expected.to contain_package('python') } if %w[RedHat Debian SUSE Archlinux].include?(os_facts[:os]['family'])
+          it { is_expected.to contain_package('python') } if %w[RedHat SUSE Archlinux].include?(os_facts[:os]['family'])
+          it { is_expected.to contain_package('python3') } if %w[Debian].include?(os_facts[:os]['family'])
           it { is_expected.to contain_package('python38') } if %w[FreeBSD].include?(os_facts[:os]['family'])
         end
 
@@ -372,7 +329,7 @@ describe 'rabbitmq' do
       describe 'does not contain pre-ranch settings with default config' do
         it do
           is_expected.to contain_file('rabbitmq.config'). \
-            without_content(%r{binary,}).                 \
+            without_content(%r{binary,}). \
             without_content(%r{\{packet,        raw\},}). \
             without_content(%r{\{reuseaddr,     true\},})
         end
@@ -383,7 +340,7 @@ describe 'rabbitmq' do
 
         it do
           is_expected.to contain_file('rabbitmq.config'). \
-            with_content(%r{binary,}).                 \
+            with_content(%r{binary,}). \
             with_content(%r{\{packet,        raw\},}). \
             with_content(%r{\{reuseaddr,     true\},})
         end
@@ -452,7 +409,22 @@ describe 'rabbitmq' do
           end
 
           it 'for cluster_nodes' do
-            is_expected.to contain_file('rabbitmq.config').with('content' => %r{cluster_nodes.*\['rabbit@hare-1', 'rabbit@hare-2'\], ram})
+            is_expected.to contain_file('rabbitmq.config').with('content' => %r{^ {4}\{cluster_nodes, \{\['rabbit@hare-1', 'rabbit@hare-2'\], ram})
+          end
+        end
+
+        describe 'without cluster_nodes and sets appropriate configuration' do
+          let(:params) do
+            {
+              config_cluster: true,
+              cluster_node_type: 'ram',
+              erlang_cookie: 'ORIGINAL',
+              wipe_db_on_cookie_change: true
+            }
+          end
+
+          it 'for cluster_nodes' do
+            is_expected.to contain_file('rabbitmq.config').with('content' => %r{^ {4}\{cluster_nodes, \{\[\], ram})
           end
         end
       end
@@ -1776,13 +1748,6 @@ describe 'rabbitmq' do
         }
       end
 
-      context 'on systems with systemd', if: os_facts[:systemd] do
-        it do
-          is_expected.to contain_service('rabbitmq-server').
-            that_requires('Class[systemd::systemctl::daemon_reload]')
-        end
-      end
-
       describe 'service with ensure stopped' do
         let :params do
           { service_ensure: 'stopped' }
@@ -1806,6 +1771,3 @@ describe 'rabbitmq' do
     end
   end
 end
-
-# rubocop:enable RSpec/RepeatedExampleGroupDescription
-# rubocop:enable RSpec/RepeatedExampleGroupBody
